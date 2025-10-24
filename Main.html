@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>マインスイーパ</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f0f0f0;
+      padding: 10px;
+      user-select: none;
+    }
+    h1 {
+      font-size: 24px;
+      margin: 10px 0;
+    }
+    #controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .flag-options {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+    }
+    label {
+      font-size: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+    input[type="radio"] {
+      transform: scale(1.5);
+      cursor: pointer;
+      margin-right: 5px;
+    }
+    button {
+      padding: 12px 24px;
+      font-size: 18px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background: #2196f3;
+      color: white;
+    }
+    #status {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    #board {
+      display: grid;
+      gap: 2px;
+      box-sizing: border-box;
+      margin: 0 auto;
+      transition: all 0.2s ease-in-out;
+    }
+    .cell {
+      background: #bbb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      aspect-ratio: 1 / 1;
+      user-select: none;
+    }
+    .cell.open {
+      background: #e0e0e0;
+    }
+    .cell.flag {
+      background: #ffeb3b;
+    }
+    .cell.mine {
+      background: #f44336;
+      color: white;
+    }
+    .timer {
+      font-size: 20px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    @media (max-width: 600px) {
+      button {
+        font-size: 16px;
+        padding: 10px 20px;
+      }
+      h1 {
+        font-size: 20px;
+      }
+      #status, .timer {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>マインスイーパ</h1>
+  <h2>1マスで爆弾2個分カウントの重爆弾が紛れ込んでいる。<br>また、本来より1少なく表示される場合がある。（最小値1）</h2>
+  
+  <div id="controls">
+    <div class="flag-options">
+      <label><input type="radio" name="flag" value="🚩">🚩</label>
+      <label><input type="radio" name="flag" value="⚠️">⚠️</label>
+      <label><input type="radio" name="flag" value="☢️">☢️</label>
+    </div>
+    <button id="resetButton">🔄 リセット</button>
+  </div>
+
+  <div id="status"></div>
+  <div id="board"></div>
+  <div id="timer" class="timer">時間: 0</div>
+
+  <script>
+    const boardEl = document.getElementById('board');
+    const statusEl = document.getElementById('status');
+    const resetButton = document.getElementById('resetButton');
+    const timerEl = document.getElementById('timer');
+    const flagRadios = document.querySelectorAll('input[name="flag"]');
+
+    const size = 20;
+    const mineCount = 100;
+    const DECEPTION_PROBABILITY = 0.5;
+
+    let gameOver = false;
+    let openedCount = 0;
+    let board = [];
+    let timer;
+    let timerSeconds = 0;
+    let firstClick = null;
+    let selectedFlag = null;
+
+    // ✅ ラジオボタンを再クリックで解除可能に
+    flagRadios.forEach(radio => {
+      radio.addEventListener('click', (e) => {
+        if (selectedFlag === e.target.value) {
+          e.target.checked = false;
+          selectedFlag = null;
+        } else {
+          selectedFlag = e.target.value;
+        }
+      });
+    });
+
+    resetButton.addEventListener('click', init);
+
+    function init() {
+      board = [];
+      gameOver = false;
+      openedCount = 0;
+      firstClick = null;
+      statusEl.textContent = '';
+      boardEl.innerHTML = '';
+      timerSeconds = 0;
+      timerEl.textContent = `時間: ${timerSeconds}`;
+      clearInterval(timer);
+      timer = setInterval(() => {
+        if (!gameOver) {
+          timerSeconds++;
+          timerEl.textContent = `時間: ${timerSeconds}`;
+        }
+      }, 1000);
+
+      const shortSide = Math.min(window.innerWidth, window.innerHeight) * 0.9;
+      boardEl.style.width = `${shortSide}px`;
+      boardEl.style.height = `${shortSide}px`;
+      boardEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+      boardEl.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+
+      for (let y = 0; y < size; y++) {
+        board[y] = [];
+        for (let x = 0; x < size; x++) {
+          const cellEl = document.createElement('div');
+          cellEl.className = 'cell';
+          boardEl.appendChild(cellEl);
+
+          const cell = {
+            x, y,
+            mine: null,
+            open: false,
+            flag: null,
+            count: 0,
+            el: cellEl
+          };
+          board[y][x] = cell;
+
+          cellEl.addEventListener('click', () => handleCellClick(cell));
+        }
+      }
+    }
+
+    function handleCellClick(cell) {
+      if (gameOver || cell.open) return;
+
+      if (selectedFlag) {
+        if (!cell.open) {
+          if (cell.flag === selectedFlag) {
+            // 同じ旗を再クリックで解除
+            cell.flag = null;
+            cell.el.textContent = '';
+            cell.el.classList.remove('flag');
+          } else {
+            cell.flag = selectedFlag;
+            cell.el.textContent = selectedFlag;
+            cell.el.classList.add('flag');
+          }
+        }
+        return;
+      }
+
+      // 通常クリック
+      if (cell.flag) return;
+
+      if (!firstClick) {
+        firstClick = { x: cell.x, y: cell.y };
+        placeMines();
+      }
+
+      openCell(cell);
+
+      if (cell.mine) {
+        cell.el.classList.add('mine');
+        cell.el.textContent = cell.mine === "heavy" ? '💥' : '💣';
+        endGame(false);
+        return;
+      }
+
+      if (cell.count === 0) {
+        openSurrounding(cell.x, cell.y);
+      }
+
+      if (openedCount === size * size - mineCount) {
+        endGame(true);
+      }
+    }
+
+    function placeMines() {
+      let mines = 0;
+      const safeCells = new Set();
+
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = firstClick.x + dx;
+          const ny = firstClick.y + dy;
+          if (nx >= 0 && ny >= 0 && nx < size && ny < size) {
+            safeCells.add(`${nx},${ny}`);
+          }
+        }
+      }
+
+      const heavyMineCount = Math.floor(Math.random() * (mineCount + 1));
+      let heavyMines = 0;
+
+      while (mines < mineCount) {
+        const x = Math.floor(Math.random() * size);
+        const y = Math.floor(Math.random() * size);
+        const cell = board[y][x];
+        if (!cell.mine && !safeCells.has(`${x},${y}`)) {
+          if (heavyMines < heavyMineCount) {
+            cell.mine = "heavy";
+            heavyMines++;
+          } else {
+            cell.mine = "normal";
+          }
+          mines++;
+        }
+      }
+
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          if (board[y][x].mine) continue;
+          board[y][x].count = getMineCount(x, y);
+        }
+      }
+    }
+
+    function getMineCount(x, y) {
+      let count = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < size && ny < size) {
+            const mineType = board[ny][nx].mine;
+            if (mineType === "normal") count += 1;
+            else if (mineType === "heavy") count += 2;
+          }
+        }
+      }
+      return count;
+    }
+
+    function openCell(cell) {
+      if (cell.open) return;
+      cell.open = true;
+      openedCount++;
+      cell.el.classList.add('open');
+      cell.el.classList.remove('flag');
+      cell.el.textContent = '';
+
+      if (cell.count > 0) {
+        let displayCount = cell.count;
+        if (Math.random() < DECEPTION_PROBABILITY) {
+          displayCount = Math.max(1, cell.count - 1);
+        }
+        cell.el.textContent = displayCount;
+        cell.el.style.color = getNumberColor(displayCount);
+      }
+    }
+
+    function getNumberColor(num) {
+      switch (num) {
+        case 1: return '#1976d2';
+        case 2: return '#388e3c';
+        case 3: return '#d32f2f';
+        case 4: return '#512da8';
+        case 5: return '#ffa000';
+        case 6: return '#00796b';
+        case 7: return '#000000';
+        case 8: return '#7b1fa2';
+        default: return '#000000';
+      }
+    }
+
+    function openSurrounding(x, y) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < size && ny < size) {
+            const neighbor = board[ny][nx];
+            if (!neighbor.open && !neighbor.mine && !neighbor.flag) {
+              openCell(neighbor);
+              if (neighbor.count === 0) {
+                openSurrounding(nx, ny);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    function endGame(win) {
+      gameOver = true;
+      clearInterval(timer);
+      if (win) {
+        statusEl.textContent = `🎉 勝利！ 時間: ${timerSeconds}秒`;
+      } else {
+        statusEl.textContent = `💥 ゲームオーバー`;
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            const cell = board[y][x];
+            if (cell.mine && !cell.open) {
+              cell.el.classList.add('mine');
+              cell.el.textContent = cell.mine === "heavy" ? '💥' : '💣';
+            }
+          }
+        }
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
