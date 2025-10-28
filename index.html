@@ -116,6 +116,10 @@
       <label><input type="radio" name="flag" value="⚠️">⚠️</label>
       <label><input type="radio" name="flag" value="☢️">☢️</label>
     </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="saveBoard()">💾 セーブ</button>
+      <button onclick="loadBoard()">📂 ロード</button>
+    </div>
   </div>
 
   <div id="status"></div>
@@ -141,9 +145,9 @@
     let firstClick = null;
     let selectedFlag = null;
 
-    // ✅ ラジオボタンを再クリックで解除可能に
+    // ✅ ラジオボタン再クリックで解除
     flagRadios.forEach(radio => {
-      radio.addEventListener('click', (e) => {
+      radio.addEventListener('click', e => {
         if (selectedFlag === e.target.value) {
           e.target.checked = false;
           selectedFlag = null;
@@ -153,7 +157,10 @@
       });
     });
 
-    resetButton.addEventListener('click', init);
+    // ✅ リセット時に確認ダイアログ
+    resetButton.addEventListener('click', () => {
+      if (confirm("本当にリセットしますか？")) init();
+    });
 
     function init() {
       board = [];
@@ -185,14 +192,7 @@
           cellEl.className = 'cell';
           boardEl.appendChild(cellEl);
 
-          const cell = {
-            x, y,
-            mine: null,
-            open: false,
-            flag: null,
-            count: 0,
-            el: cellEl
-          };
+          const cell = {x, y, mine: null, open: false, flag: null, count: 0, el: cellEl};
           board[y][x] = cell;
 
           cellEl.addEventListener('click', () => handleCellClick(cell));
@@ -206,7 +206,6 @@
       if (selectedFlag) {
         if (!cell.open) {
           if (cell.flag === selectedFlag) {
-            // 同じ旗を再クリックで解除
             cell.flag = null;
             cell.el.textContent = '';
             cell.el.classList.remove('flag');
@@ -219,7 +218,6 @@
         return;
       }
 
-      // 通常クリック
       if (cell.flag) return;
 
       if (!firstClick) {
@@ -236,139 +234,173 @@
         return;
       }
 
-      if (cell.count === 0) {
-        openSurrounding(cell.x, cell.y);
-      }
-
-      if (openedCount === size * size - mineCount) {
-        endGame(true);
-      }
+      if (cell.count === 0) openSurrounding(cell.x, cell.y);
+      if (openedCount === size * size - mineCount) endGame(true);
     }
 
     function placeMines() {
       let mines = 0;
-      const safeCells = new Set();
-
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = firstClick.x + dx;
-          const ny = firstClick.y + dy;
-          if (nx >= 0 && ny >= 0 && nx < size && ny < size) {
-            safeCells.add(`${nx},${ny}`);
-          }
-        }
-      }
+      const safe = new Set();
+      for (let dy=-1;dy<=1;dy++)
+        for (let dx=-1;dx<=1;dx++)
+          safe.add(`${firstClick.x+dx},${firstClick.y+dy}`);
 
       const heavyMineCount = Math.floor(Math.random() * (mineCount + 1));
-      let heavyMines = 0;
+      let heavy = 0;
 
       while (mines < mineCount) {
         const x = Math.floor(Math.random() * size);
         const y = Math.floor(Math.random() * size);
-        const cell = board[y][x];
-        if (!cell.mine && !safeCells.has(`${x},${y}`)) {
-          if (heavyMines < heavyMineCount) {
-            cell.mine = "heavy";
-            heavyMines++;
-          } else {
-            cell.mine = "normal";
-          }
+        const c = board[y][x];
+        if (!c.mine && !safe.has(`${x},${y}`)) {
+          c.mine = (heavy < heavyMineCount) ? "heavy" : "normal";
+          if (c.mine === "heavy") heavy++;
           mines++;
         }
       }
 
-      for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-          if (board[y][x].mine) continue;
-          board[y][x].count = getMineCount(x, y);
-        }
-      }
+      for (let y=0;y<size;y++)
+        for (let x=0;x<size;x++)
+          if (!board[y][x].mine)
+            board[y][x].count = getMineCount(x,y);
     }
 
-    function getMineCount(x, y) {
-      let count = 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx >= 0 && ny >= 0 && nx < size && ny < size) {
-            const mineType = board[ny][nx].mine;
-            if (mineType === "normal") count += 1;
-            else if (mineType === "heavy") count += 2;
+    function getMineCount(x,y){
+      let n=0;
+      for(let dy=-1;dy<=1;dy++)
+        for(let dx=-1;dx<=1;dx++){
+          const nx=x+dx,ny=y+dy;
+          if(nx>=0&&ny>=0&&nx<size&&ny<size){
+            const m=board[ny][nx].mine;
+            if(m==="normal")n++;
+            else if(m==="heavy")n+=2;
           }
         }
-      }
-      return count;
+      return n;
     }
 
-    function openCell(cell) {
-      if (cell.open) return;
-      cell.open = true;
-      openedCount++;
-      cell.el.classList.add('open');
-      cell.el.classList.remove('flag');
-      cell.el.textContent = '';
-
-      if (cell.count > 0) {
-        let displayCount = cell.count;
-        if (Math.random() < DECEPTION_PROBABILITY) {
-          displayCount = Math.max(1, cell.count - 1);
-        }
-        cell.el.textContent = displayCount;
-        cell.el.style.color = getNumberColor(displayCount);
+    function openCell(cell){
+      if(cell.open)return;
+      cell.open=true; openedCount++;
+      cell.el.classList.add('open'); cell.el.classList.remove('flag');
+      if(cell.count>0){
+        let display=cell.count;
+        if(Math.random()<DECEPTION_PROBABILITY)display=Math.max(1,cell.count-1);
+        cell.el.textContent=display;
+        cell.el.style.color=getNumberColor(display);
       }
     }
 
-    function getNumberColor(num) {
-      switch (num) {
-        case 1: return '#1976d2';
-        case 2: return '#388e3c';
-        case 3: return '#d32f2f';
-        case 4: return '#512da8';
-        case 5: return '#ffa000';
-        case 6: return '#00796b';
-        case 7: return '#000000';
-        case 8: return '#7b1fa2';
-        default: return '#000000';
-      }
+    function getNumberColor(n){
+      return ['#000','#1976d2','#388e3c','#d32f2f','#512da8','#ffa000','#00796b','#000','#7b1fa2'][n]||'#000';
     }
 
-    function openSurrounding(x, y) {
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx >= 0 && ny >= 0 && nx < size && ny < size) {
-            const neighbor = board[ny][nx];
-            if (!neighbor.open && !neighbor.mine && !neighbor.flag) {
-              openCell(neighbor);
-              if (neighbor.count === 0) {
-                openSurrounding(nx, ny);
+    function openSurrounding(x,y){
+      for(let dy=-1;dy<=1;dy++)
+        for(let dx=-1;dx<=1;dx++){
+          if(dx||dy){
+            const nx=x+dx,ny=y+dy;
+            if(nx>=0&&ny>=0&&nx<size&&ny<size){
+              const n=board[ny][nx];
+              if(!n.open&&!n.mine&&!n.flag){
+                openCell(n);
+                if(n.count===0)openSurrounding(nx,ny);
               }
             }
           }
         }
+    }
+
+    function endGame(win){
+      gameOver=true; clearInterval(timer);
+      if(win) statusEl.textContent=`🎉 勝利！ 時間: ${timerSeconds}秒`;
+      else{
+        statusEl.textContent=`💥 ゲームオーバー`;
+        for(let y=0;y<size;y++)
+          for(let x=0;x<size;x++){
+            const c=board[y][x];
+            if(c.mine&&!c.open){
+              c.el.classList.add('mine');
+              c.el.textContent=c.mine==="heavy"?'💥':'💣';
+            }
+          }
       }
     }
 
-    function endGame(win) {
-      gameOver = true;
-      clearInterval(timer);
-      if (win) {
-        statusEl.textContent = `🎉 勝利！ 時間: ${timerSeconds}秒`;
-      } else {
-        statusEl.textContent = `💥 ゲームオーバー`;
-        for (let y = 0; y < size; y++) {
-          for (let x = 0; x < size; x++) {
-            const cell = board[y][x];
-            if (cell.mine && !cell.open) {
-              cell.el.classList.add('mine');
-              cell.el.textContent = cell.mine === "heavy" ? '💥' : '💣';
+    // 💾 セーブ機能（mine + bluff + flag）
+    function saveBoard(){
+      if(!firstClick)return alert("盤面未生成です");
+      let bits="";
+      for(let y=0;y<size;y++){
+        for(let x=0;x<size;x++){
+          const c=board[y][x];
+          const m=c.mine==="heavy"?2:c.mine?1:0;
+          const bluff=(c.open && /^\d+$/.test(c.el.textContent) && parseInt(c.el.textContent)<c.count)?1:0;
+          const f=c.flag==="🚩"?1:c.flag==="⚠️"?2:c.flag==="☢️"?3:0;
+          bits+=m.toString(2).padStart(2,'0')+bluff+f.toString(2).padStart(2,'0');
+        }
+      }
+      while(bits.length%6)bits+="0";
+      const chars="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+      let s="";
+      for(let i=0;i<bits.length;i+=6)
+        s+=chars[parseInt(bits.slice(i,i+6),2)];
+      prompt("セーブデータをコピーしてください",s);
+    }
+
+    // 📂 ロード機能
+    function loadBoard(){
+      const s=prompt("セーブデータを入力してください");
+      if(!s)return;
+      const chars="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+      let bits="";
+      for(const ch of s){
+        const v=chars.indexOf(ch);
+        if(v>=0)bits+=v.toString(2).padStart(6,'0');
+      }
+
+      init();
+      let i=0; const bluffs=[];
+      for(let y=0;y<size;y++){
+        for(let x=0;x<size;x++){
+          const m=parseInt(bits.slice(i,i+2),2);i+=2;
+          const b=bits[i++]==="1";
+          const f=parseInt(bits.slice(i,i+2),2);i+=2;
+          const c=board[y][x];
+          if(m===1)c.mine="normal";
+          else if(m===2)c.mine="heavy";
+          if(f){
+            c.flag=["","🚩","⚠️","☢️"][f];
+            c.el.textContent=c.flag;
+            c.el.classList.add("flag");
+          }
+          bluffs.push(b);
+        }
+      }
+
+      for(let y=0;y<size;y++)
+        for(let x=0;x<size;x++)
+          if(!board[y][x].mine)
+            board[y][x].count=getMineCount(x,y);
+
+      let k=0;
+      for(let y=0;y<size;y++){
+        for(let x=0;x<size;x++){
+          const c=board[y][x];
+          const bluff=bluffs[k++];
+          if(!c.mine){
+            c.open=true;
+            c.el.classList.add("open");
+            let n=c.count;
+            if(bluff)n=Math.max(1,n-1);
+            if(n>0){
+              c.el.textContent=n;
+              c.el.style.color=getNumberColor(n);
             }
           }
         }
       }
+      statusEl.textContent="ロード完了";
     }
 
     init();
