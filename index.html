@@ -15,100 +15,41 @@
       padding: 10px;
       user-select: none;
     }
-    h1 {
-      font-size: 24px;
-      margin: 10px 0;
-    }
-    #controls {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    .flag-options {
-      display: flex;
-      gap: 15px;
-      justify-content: center;
-    }
-    label {
-      font-size: 24px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-    }
-    input[type="radio"] {
-      transform: scale(1.5);
-      cursor: pointer;
-      margin-right: 5px;
-    }
+    h1 { font-size: 24px; margin: 10px 0; }
+    #controls { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .flag-options { display: flex; gap: 15px; justify-content: center; }
+    label { font-size: 24px; cursor: pointer; display: flex; align-items: center; }
+    input[type="radio"] { transform: scale(1.5); cursor: pointer; margin-right: 5px; }
     button {
-      padding: 12px 24px;
-      font-size: 18px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      background: #2196f3;
-      color: white;
+      padding: 12px 24px; font-size: 18px; border: none; border-radius: 5px;
+      cursor: pointer; background: #2196f3; color: white;
     }
-    #status {
-      font-size: 18px;
-      font-weight: bold;
-      margin-top: 10px;
-    }
+    #status { font-size: 18px; font-weight: bold; margin-top: 10px; }
     #board {
-      display: grid;
-      gap: 2px;
-      box-sizing: border-box;
-      margin: 0 auto;
+      display: grid; gap: 2px; box-sizing: border-box; margin: 0 auto;
       transition: all 0.2s ease-in-out;
     }
     .cell {
-      background: #bbb;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      font-weight: bold;
-      color: #333;
-      border-radius: 3px;
-      cursor: pointer;
-      transition: background-color 0.2s;
-      aspect-ratio: 1 / 1;
-      user-select: none;
+      background: #bbb; display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: bold; color: #333; border-radius: 3px;
+      cursor: pointer; transition: background-color 0.2s;
+      aspect-ratio: 1 / 1; user-select: none;
     }
-    .cell.open {
-      background: #e0e0e0;
-    }
-    .cell.flag {
-      background: #ffeb3b;
-    }
-    .cell.mine {
-      background: #f44336;
-      color: white;
-    }
-    .timer {
-      font-size: 20px;
-      font-weight: bold;
-      margin-top: 10px;
-    }
+    .cell.open { background: #e0e0e0; }
+    .cell.flag { background: #ffeb3b; }
+    .cell.mine { background: #f44336; color: white; }
+    .timer { font-size: 20px; font-weight: bold; margin-top: 10px; }
     @media (max-width: 600px) {
-      button {
-        font-size: 16px;
-        padding: 10px 20px;
-      }
-      h1 {
-        font-size: 20px;
-      }
-      #status, .timer {
-        font-size: 16px;
-      }
+      button { font-size: 16px; padding: 10px 20px; }
+      h1 { font-size: 20px; }
+      #status, .timer { font-size: 16px; }
     }
   </style>
 </head>
 <body>
   <h1>マインスイーパ</h1>
   <h2>1マスで爆弾2個分カウントの重爆弾が紛れ込んでいる。<br>また、本来より1少なく表示される場合がある。（最小値1）</h2>
+
   <div id="controls">
     <button id="resetButton">🔄 リセット</button>
     <div class="flag-options">
@@ -137,47 +78,28 @@
     const mineCount = 100;
     const DECEPTION_PROBABILITY = 0.5;
 
-    let gameOver = false;
-    let openedCount = 0;
-    let board = [];
-    let timer;
-    let timerSeconds = 0;
-    let firstClick = null;
-    let selectedFlag = null;
+    let gameOver = false, openedCount = 0, board = [], timer, timerSeconds = 0, firstClick = null, selectedFlag = null;
 
     // ✅ ラジオボタン再クリックで解除
     flagRadios.forEach(radio => {
       radio.addEventListener('click', e => {
         if (selectedFlag === e.target.value) {
-          e.target.checked = false;
-          selectedFlag = null;
-        } else {
-          selectedFlag = e.target.value;
-        }
+          e.target.checked = false; selectedFlag = null;
+        } else selectedFlag = e.target.value;
       });
     });
 
-    // ✅ リセット時に確認ダイアログ
+    // ✅ リセット確認
     resetButton.addEventListener('click', () => {
       if (confirm("本当にリセットしますか？")) init();
     });
 
     function init() {
-      board = [];
-      gameOver = false;
-      openedCount = 0;
-      firstClick = null;
-      statusEl.textContent = '';
-      boardEl.innerHTML = '';
-      timerSeconds = 0;
-      timerEl.textContent = `時間: ${timerSeconds}`;
+      board = []; gameOver = false; openedCount = 0; firstClick = null;
+      statusEl.textContent = ''; boardEl.innerHTML = '';
+      timerSeconds = 0; timerEl.textContent = `時間: ${timerSeconds}`;
       clearInterval(timer);
-      timer = setInterval(() => {
-        if (!gameOver) {
-          timerSeconds++;
-          timerEl.textContent = `時間: ${timerSeconds}`;
-        }
-      }, 1000);
+      timer = setInterval(() => { if (!gameOver) timerEl.textContent = `時間: ${++timerSeconds}`; }, 1000);
 
       const shortSide = Math.min(window.innerWidth, window.innerHeight) * 0.9;
       boardEl.style.width = `${shortSide}px`;
@@ -188,106 +110,73 @@
       for (let y = 0; y < size; y++) {
         board[y] = [];
         for (let x = 0; x < size; x++) {
-          const cellEl = document.createElement('div');
-          cellEl.className = 'cell';
-          boardEl.appendChild(cellEl);
-
-          const cell = {x, y, mine: null, open: false, flag: null, count: 0, el: cellEl};
+          const el = document.createElement('div');
+          el.className = 'cell';
+          boardEl.appendChild(el);
+          const cell = { x, y, mine: null, open: false, flag: null, count: 0, el };
           board[y][x] = cell;
-
-          cellEl.addEventListener('click', () => handleCellClick(cell));
+          el.addEventListener('click', () => handleCellClick(cell));
         }
       }
     }
 
     function handleCellClick(cell) {
       if (gameOver || cell.open) return;
-
       if (selectedFlag) {
         if (!cell.open) {
           if (cell.flag === selectedFlag) {
-            cell.flag = null;
-            cell.el.textContent = '';
-            cell.el.classList.remove('flag');
+            cell.flag = null; cell.el.textContent = ''; cell.el.classList.remove('flag');
           } else {
-            cell.flag = selectedFlag;
-            cell.el.textContent = selectedFlag;
-            cell.el.classList.add('flag');
+            cell.flag = selectedFlag; cell.el.textContent = selectedFlag; cell.el.classList.add('flag');
           }
         }
         return;
       }
-
       if (cell.flag) return;
-
-      if (!firstClick) {
-        firstClick = { x: cell.x, y: cell.y };
-        placeMines();
-      }
-
+      if (!firstClick) { firstClick = { x: cell.x, y: cell.y }; placeMines(); }
       openCell(cell);
-
       if (cell.mine) {
-        cell.el.classList.add('mine');
-        cell.el.textContent = cell.mine === "heavy" ? '💥' : '💣';
-        endGame(false);
-        return;
+        cell.el.classList.add('mine'); cell.el.textContent = cell.mine === "heavy" ? '💥' : '💣';
+        endGame(false); return;
       }
-
       if (cell.count === 0) openSurrounding(cell.x, cell.y);
       if (openedCount === size * size - mineCount) endGame(true);
     }
 
     function placeMines() {
-      let mines = 0;
-      const safe = new Set();
-      for (let dy=-1;dy<=1;dy++)
-        for (let dx=-1;dx<=1;dx++)
-          safe.add(`${firstClick.x+dx},${firstClick.y+dy}`);
-
-      const heavyMineCount = Math.floor(Math.random() * (mineCount + 1));
-      let heavy = 0;
-
+      let mines = 0; const safe = new Set();
+      for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) safe.add(`${firstClick.x+dx},${firstClick.y+dy}`);
+      const heavyMineCount = Math.floor(Math.random() * (mineCount + 1)); let heavy = 0;
       while (mines < mineCount) {
-        const x = Math.floor(Math.random() * size);
-        const y = Math.floor(Math.random() * size);
+        const x = Math.floor(Math.random() * size), y = Math.floor(Math.random() * size);
         const c = board[y][x];
         if (!c.mine && !safe.has(`${x},${y}`)) {
           c.mine = (heavy < heavyMineCount) ? "heavy" : "normal";
-          if (c.mine === "heavy") heavy++;
-          mines++;
+          if (c.mine === "heavy") heavy++; mines++;
         }
       }
-
-      for (let y=0;y<size;y++)
-        for (let x=0;x<size;x++)
-          if (!board[y][x].mine)
-            board[y][x].count = getMineCount(x,y);
+      for (let y=0;y<size;y++) for (let x=0;x<size;x++) if (!board[y][x].mine) board[y][x].count = getMineCount(x,y);
     }
 
     function getMineCount(x,y){
       let n=0;
-      for(let dy=-1;dy<=1;dy++)
-        for(let dx=-1;dx<=1;dx++){
-          const nx=x+dx,ny=y+dy;
-          if(nx>=0&&ny>=0&&nx<size&&ny<size){
-            const m=board[ny][nx].mine;
-            if(m==="normal")n++;
-            else if(m==="heavy")n+=2;
-          }
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+        const nx=x+dx,ny=y+dy;
+        if(nx>=0&&ny>=0&&nx<size&&ny<size){
+          const m=board[ny][nx].mine;
+          if(m==="normal")n++; else if(m==="heavy")n+=2;
         }
+      }
       return n;
     }
 
     function openCell(cell){
-      if(cell.open)return;
-      cell.open=true; openedCount++;
-      cell.el.classList.add('open'); cell.el.classList.remove('flag');
+      if(cell.open)return; cell.open=true; openedCount++;
+      cell.el.classList.add('open'); cell.el.classList.remove('flag'); cell.el.textContent='';
       if(cell.count>0){
-        let display=cell.count;
-        if(Math.random()<DECEPTION_PROBABILITY)display=Math.max(1,cell.count-1);
-        cell.el.textContent=display;
-        cell.el.style.color=getNumberColor(display);
+        let d=cell.count;
+        if(Math.random()<DECEPTION_PROBABILITY)d=Math.max(1,cell.count-1);
+        cell.el.textContent=d; cell.el.style.color=getNumberColor(d);
       }
     }
 
@@ -296,110 +185,92 @@
     }
 
     function openSurrounding(x,y){
-      for(let dy=-1;dy<=1;dy++)
-        for(let dx=-1;dx<=1;dx++){
-          if(dx||dy){
-            const nx=x+dx,ny=y+dy;
-            if(nx>=0&&ny>=0&&nx<size&&ny<size){
-              const n=board[ny][nx];
-              if(!n.open&&!n.mine&&!n.flag){
-                openCell(n);
-                if(n.count===0)openSurrounding(nx,ny);
-              }
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+        if(dx||dy){
+          const nx=x+dx,ny=y+dy;
+          if(nx>=0&&ny>=0&&nx<size&&ny<size){
+            const n=board[ny][nx];
+            if(!n.open&&!n.mine&&!n.flag){
+              openCell(n);
+              if(n.count===0)openSurrounding(nx,ny);
             }
           }
         }
+      }
     }
 
     function endGame(win){
       gameOver=true; clearInterval(timer);
       if(win) statusEl.textContent=`🎉 勝利！ 時間: ${timerSeconds}秒`;
-      else{
+      else {
         statusEl.textContent=`💥 ゲームオーバー`;
-        for(let y=0;y<size;y++)
-          for(let x=0;x<size;x++){
-            const c=board[y][x];
-            if(c.mine&&!c.open){
-              c.el.classList.add('mine');
-              c.el.textContent=c.mine==="heavy"?'💥':'💣';
-            }
-          }
+        for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+          const c=board[y][x];
+          if(c.mine&&!c.open){ c.el.classList.add('mine'); c.el.textContent=c.mine==="heavy"?'💥':'💣'; }
+        }
       }
     }
 
-    // 💾 セーブ機能（mine + bluff + flag）
+    // 💾 セーブ機能（mine + bluff + open + flag）
     function saveBoard(){
       if(!firstClick)return alert("盤面未生成です");
       let bits="";
-      for(let y=0;y<size;y++){
-        for(let x=0;x<size;x++){
-          const c=board[y][x];
-          const m=c.mine==="heavy"?2:c.mine?1:0;
-          const bluff=(c.open && /^\d+$/.test(c.el.textContent) && parseInt(c.el.textContent)<c.count)?1:0;
-          const f=c.flag==="🚩"?1:c.flag==="⚠️"?2:c.flag==="☢️"?3:0;
-          bits+=m.toString(2).padStart(2,'0')+bluff+f.toString(2).padStart(2,'0');
-        }
+      for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+        const c=board[y][x];
+        const m=c.mine==="heavy"?2:c.mine?1:0;
+        const bluff=(c.open && /^\d+$/.test(c.el.textContent) && parseInt(c.el.textContent)<c.count)?1:0;
+        const open=c.open?1:0;
+        const f=c.flag==="🚩"?1:c.flag==="⚠️"?2:c.flag==="☢️"?3:0;
+        bits += m.toString(2).padStart(2,'0') + bluff + open + f.toString(2).padStart(2,'0');
       }
       while(bits.length%6)bits+="0";
       const chars="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
       let s="";
-      for(let i=0;i<bits.length;i+=6)
-        s+=chars[parseInt(bits.slice(i,i+6),2)];
+      for(let i=0;i<bits.length;i+=6) s+=chars[parseInt(bits.slice(i,i+6),2)];
       prompt("セーブデータをコピーしてください",s);
     }
 
-    // 📂 ロード機能
+    // 📂 ロード機能（完全復元）
     function loadBoard(){
-      const s=prompt("セーブデータを入力してください");
-      if(!s)return;
+      const s=prompt("セーブデータを入力してください"); if(!s)return;
       const chars="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-      let bits="";
-      for(const ch of s){
-        const v=chars.indexOf(ch);
-        if(v>=0)bits+=v.toString(2).padStart(6,'0');
-      }
+      let bits=""; for(const ch of s){ const v=chars.indexOf(ch); if(v>=0)bits+=v.toString(2).padStart(6,'0'); }
 
       init();
-      let i=0; const bluffs=[];
-      for(let y=0;y<size;y++){
-        for(let x=0;x<size;x++){
-          const m=parseInt(bits.slice(i,i+2),2);i+=2;
-          const b=bits[i++]==="1";
-          const f=parseInt(bits.slice(i,i+2),2);i+=2;
-          const c=board[y][x];
-          if(m===1)c.mine="normal";
-          else if(m===2)c.mine="heavy";
-          if(f){
-            c.flag=["","🚩","⚠️","☢️"][f];
-            c.el.textContent=c.flag;
-            c.el.classList.add("flag");
-          }
-          bluffs.push(b);
+      let i=0; const data=[];
+      for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+        const m=parseInt(bits.slice(i,i+2),2); i+=2;
+        const bluff=bits[i++]==="1";
+        const open=bits[i++]==="1";
+        const f=parseInt(bits.slice(i,i+2),2); i+=2;
+        data.push({x,y,m,bluff,open,flag:f});
+      }
+
+      // 復元処理
+      for(const d of data){
+        const c=board[d.y][d.x];
+        if(d.m===1)c.mine="normal";
+        else if(d.m===2)c.mine="heavy";
+        if(d.flag){
+          c.flag=["","🚩","⚠️","☢️"][d.flag];
+          c.el.textContent=c.flag; c.el.classList.add("flag");
         }
       }
 
-      for(let y=0;y<size;y++)
-        for(let x=0;x<size;x++)
-          if(!board[y][x].mine)
-            board[y][x].count=getMineCount(x,y);
+      // カウント再計算
+      for(let y=0;y<size;y++) for(let x=0;x<size;x++)
+        if(!board[y][x].mine) board[y][x].count=getMineCount(x,y);
 
-      let k=0;
-      for(let y=0;y<size;y++){
-        for(let x=0;x<size;x++){
-          const c=board[y][x];
-          const bluff=bluffs[k++];
-          if(!c.mine){
-            c.open=true;
-            c.el.classList.add("open");
-            let n=c.count;
-            if(bluff)n=Math.max(1,n-1);
-            if(n>0){
-              c.el.textContent=n;
-              c.el.style.color=getNumberColor(n);
-            }
-          }
+      // 開封状態・虚偽表示の再現
+      for(const d of data){
+        const c=board[d.y][d.x];
+        if(d.open && !c.mine){
+          c.open=true; c.el.classList.add("open");
+          let n=c.count; if(d.bluff)n=Math.max(1,n-1);
+          if(n>0){ c.el.textContent=n; c.el.style.color=getNumberColor(n); }
         }
       }
+
       statusEl.textContent="ロード完了";
     }
 
