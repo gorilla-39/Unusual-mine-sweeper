@@ -206,65 +206,79 @@
         s += chars[parseInt(bits.slice(i, i + 6), 2)];
       prompt("セーブデータをコピーしてください", s);
     }
-
+    
     // === 修正版 ロード ===
-    function loadBoard() {
-      const s = prompt("セーブデータを入力してください");
-      if (!s) return;
+function loadBoard() {
+  const s = prompt("セーブデータを入力してください");
+  if (!s) return;
 
-      let bits = "";
-      for (const ch of s) {
-        const v = chars.indexOf(ch);
-        if (v < 0) return alert("不正な文字が含まれています");
-        bits += v.toString(2).padStart(6, '0');
-      }
+  let bits = "";
+  for (const ch of s) {
+    const v = chars.indexOf(ch);
+    if (v < 0) return alert("不正な文字が含まれています");
+    bits += v.toString(2).padStart(6, '0');
+  }
 
-      const expectedBits = size * size * 6;
-      if (bits.length < expectedBits) {
-        alert("セーブデータが短すぎます");
-        return;
-      }
+  const expectedBits = size * size * 6;
+  if (bits.length < expectedBits) {
+    alert("セーブデータが短すぎます");
+    return;
+  }
 
-      init();
+  // 空盤面を再生成
+  init();
 
-      let i = 0;
-      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-        const m = parseInt(bits.slice(i, i + 2), 2); i += 2;
-        const bluff = bits[i++] === "1";
-        const open = bits[i++] === "1";
-        const f = parseInt(bits.slice(i, i + 2), 2); i += 2;
-
-        const c = board[y][x];
-        if (m === 1) c.mine = "normal";
-        else if (m === 2) c.mine = "heavy";
-        if (f) {
-          c.flag = ["", "🚩", "⚠️", "☢️"][f];
-          c.el.textContent = c.flag;
-          c.el.classList.add('flag');
-        }
-        c._bluff = bluff;
-        c._openSaved = open;
-      }
-
-      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++)
-        if (!board[y][x].mine) board[y][x].count = getCount(x, y);
-
-      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-        const c = board[y][x];
-        if (c._openSaved && !c.mine) {
-          c.open = true;
-          c.el.classList.add('open');
-          let n = c.count;
-          if (c._bluff) n = Math.max(1, n - 1);
-          if (n > 0) {
-            c.el.textContent = n;
-            c.el.style.color = getColor(n);
-          }
-        }
-      }
-
-      statusEl.textContent = "ロード完了 ✅";
+  // === 1. データ解析 ===
+  let i = 0;
+  const data = [];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const m = parseInt(bits.slice(i, i + 2), 2); i += 2;
+      const bluff = bits[i++] === "1";
+      const open = bits[i++] === "1";
+      const f = parseInt(bits.slice(i, i + 2), 2); i += 2;
+      data.push({ x, y, m, bluff, open, f });
     }
+  }
+
+  // === 2. 地雷のみ反映 ===
+  for (const d of data) {
+    const c = board[d.y][d.x];
+    if (d.m === 1) c.mine = "normal";
+    else if (d.m === 2) c.mine = "heavy";
+  }
+
+  // === 3. 全セルのカウント再計算 ===
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const c = board[y][x];
+      if (!c.mine) c.count = getCount(x, y);
+    }
+  }
+
+  // === 4. 旗・開封・表示再現 ===
+  for (const d of data) {
+    const c = board[d.y][d.x];
+    if (d.f) {
+      c.flag = ["", "🚩", "⚠️", "☢️"][d.f];
+      c.el.textContent = c.flag;
+      c.el.classList.add('flag');
+    }
+    if (d.open && !c.mine) {
+      c.open = true;
+      c.el.classList.add('open');
+      let n = c.count;
+      if (d.bluff) n = Math.max(1, n - 1);
+      if (n > 0) {
+        c.el.textContent = n;
+        c.el.style.color = getColor(n);
+      }
+    }
+  }
+
+  statusEl.textContent = "ロード完了 ✅";
+}
+
 
     init();
   </script>
