@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>マインスイーパ</title>
+  <title>マインスイーパ（高/鬼）</title>
   <style>
     body {
       margin: 0; font-family: sans-serif; display: flex; flex-direction: column; align-items: center;
@@ -36,8 +36,8 @@
   </style>
 </head>
 <body>
-  <h1>マインスイーパ</h1>
-  <h2>1マスで爆弾2個分カウントの重爆弾が紛れ込んでいる。<br>また、本来より1少なく表示される場合がある。（最小値1）</h2>
+  <h1>マインスイーパ（難易度：高 / 鬼）</h1>
+  <h2>難易度「鬼」では重爆弾（2カウント）と偽情報が混入します。</h2>
 
   <div id="controls">
     <button id="resetButton">🔄 リセット</button>
@@ -59,16 +59,31 @@
   <script>
     const size = 20, mineCount = 100, DECEPTION_PROBABILITY = 0.5;
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let board = [], gameOver = false, openedCount = 0, timer, timerSeconds = 0, firstClick = null, selectedFlag = null;
+    let board = [], gameOver = false, openedCount = 0, timer, timerSeconds = 0;
+    let firstClick = null, selectedFlag = null;
+
+    // ★★ 追加：難易度管理
+    // "high" = 高（重爆弾なし）
+    // "oni"  = 鬼（重爆弾あり） ←従来仕様
+    let difficulty = "high";  // デフォルトは高
 
     const boardEl = document.getElementById("board"),
           statusEl = document.getElementById("status"),
           timerEl = document.getElementById("timer");
 
+    // リセットボタン → 難易度選択
     document.getElementById("resetButton").addEventListener("click", () => {
-      if (confirm("本当にリセットしますか？")) init();
+      const diff = prompt("難易度を選択してください\n・高（重爆弾なし）\n・鬼（重爆弾あり）", "高");
+      if (!diff) return;
+
+      if (diff === "高") difficulty = "high";
+      else if (diff === "鬼") difficulty = "oni";
+      else return alert("「高」か「鬼」で入力してください");
+
+      init();
     });
 
+    // 旗設定
     document.querySelectorAll('input[name="flag"]').forEach(r => {
       r.addEventListener('click', e => {
         if (selectedFlag === e.target.value) { e.target.checked = false; selectedFlag = null; }
@@ -76,6 +91,7 @@
       });
     });
 
+    // ★★ init：難易度反映
     function init() {
       board = []; gameOver = false; openedCount = 0; firstClick = null;
       statusEl.textContent = ''; boardEl.innerHTML = '';
@@ -97,6 +113,9 @@
           board[y][x] = cell;
         }
       }
+
+      // 現在の難易度を表示
+      statusEl.textContent = `難易度：${difficulty === "high" ? "高" : "鬼"}`;
     }
 
     function handleClick(c) {
@@ -119,20 +138,33 @@
       if (openedCount === size * size - mineCount) endGame(true);
     }
 
+    // ★★ 難易度によって重爆弾を配置しない
     function placeMines() {
       const safe = new Set();
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++)
         safe.add(`${firstClick.x + dx},${firstClick.y + dy}`);
-      let mines = 0, heavyCount = Math.floor(Math.random() * (mineCount + 1)), heavy = 0;
+
+      let mines = 0;
+      let heavyCount = 0, heavy = 0;
+
+      if (difficulty === "oni") {
+        heavyCount = Math.floor(Math.random() * (mineCount + 1)); // 鬼は重爆あり
+      }
+
       while (mines < mineCount) {
         const x = Math.floor(Math.random() * size), y = Math.floor(Math.random() * size);
         const c = board[y][x];
         if (!c.mine && !safe.has(`${x},${y}`)) {
-          c.mine = (heavy < heavyCount) ? "heavy" : "normal";
-          if (c.mine === "heavy") heavy++;
+          if (difficulty === "oni" && heavy < heavyCount) {
+            c.mine = "heavy"; heavy++;
+          } else {
+            c.mine = "normal";
+          }
           mines++;
         }
       }
+
+      // 周囲のカウント計算
       for (let y = 0; y < size; y++) for (let x = 0; x < size; x++)
         if (!board[y][x].mine) board[y][x].count = getCount(x, y);
     }
@@ -143,7 +175,8 @@
         const nx = x + dx, ny = y + dy;
         if (nx >= 0 && ny >= 0 && nx < size && ny < size) {
           const m = board[ny][nx].mine;
-          if (m === "normal") n++; else if (m === "heavy") n += 2;
+          if (m === "normal") n++;
+          else if (m === "heavy") n += 2;
         }
       }
       return n;
@@ -153,7 +186,8 @@
       if (c.open) return; c.open = true; openedCount++;
       c.el.classList.add('open'); c.el.classList.remove('flag');
       if (c.count > 0) {
-        let d = c.count; if (Math.random() < DECEPTION_PROBABILITY) d = Math.max(1, c.count - 1);
+        let d = c.count;
+        if (Math.random() < DECEPTION_PROBABILITY) d = Math.max(1, c.count - 1);
         c.el.textContent = d; c.el.style.color = getColor(d);
       }
     }
@@ -183,12 +217,12 @@
         statusEl.textContent = "💥 ゲームオーバー";
         for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
           const c = board[y][x];
-          if (c.mine && !c.open) { c.el.classList.add('mine'); c.el.textContent = c.mine === "heavy" ? '💥' : '💣'; }
+          if (c.mine && !c.open) c.el.classList.add('mine'), c.el.textContent = c.mine === "heavy" ? '💥' : '💣';
         }
       }
     }
 
-    // === 修正版 セーブ ===
+    // === セーブ ===
     function saveBoard() {
       if (!firstClick) return alert("盤面未生成です");
       let bits = "";
@@ -206,79 +240,69 @@
         s += chars[parseInt(bits.slice(i, i + 6), 2)];
       prompt("セーブデータをコピーしてください", s);
     }
-    
-    // === 修正版 ロード ===
-function loadBoard() {
-  const s = prompt("セーブデータを入力してください");
-  if (!s) return;
 
-  let bits = "";
-  for (const ch of s) {
-    const v = chars.indexOf(ch);
-    if (v < 0) return alert("不正な文字が含まれています");
-    bits += v.toString(2).padStart(6, '0');
-  }
+    // === ロード ===
+    function loadBoard() {
+      const s = prompt("セーブデータを入力してください");
+      if (!s) return;
 
-  const expectedBits = size * size * 6;
-  if (bits.length < expectedBits) {
-    alert("セーブデータが短すぎます");
-    return;
-  }
-
-  // 空盤面を再生成
-  init();
-
-  // === 1. データ解析 ===
-  let i = 0;
-  const data = [];
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const m = parseInt(bits.slice(i, i + 2), 2); i += 2;
-      const bluff = bits[i++] === "1";
-      const open = bits[i++] === "1";
-      const f = parseInt(bits.slice(i, i + 2), 2); i += 2;
-      data.push({ x, y, m, bluff, open, f });
-    }
-  }
-
-  // === 2. 地雷のみ反映 ===
-  for (const d of data) {
-    const c = board[d.y][d.x];
-    if (d.m === 1) c.mine = "normal";
-    else if (d.m === 2) c.mine = "heavy";
-  }
-
-  // === 3. 全セルのカウント再計算 ===
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const c = board[y][x];
-      if (!c.mine) c.count = getCount(x, y);
-    }
-  }
-
-  // === 4. 旗・開封・表示再現 ===
-  for (const d of data) {
-    const c = board[d.y][d.x];
-    if (d.f) {
-      c.flag = ["", "🚩", "⚠️", "☢️"][d.f];
-      c.el.textContent = c.flag;
-      c.el.classList.add('flag');
-    }
-    if (d.open && !c.mine) {
-      c.open = true;
-      c.el.classList.add('open');
-      let n = c.count;
-      if (d.bluff) n = Math.max(1, n - 1);
-      if (n > 0) {
-        c.el.textContent = n;
-        c.el.style.color = getColor(n);
+      let bits = "";
+      for (const ch of s) {
+        const v = chars.indexOf(ch);
+        if (v < 0) return alert("不正な文字が含まれています");
+        bits += v.toString(2).padStart(6, '0');
       }
+
+      const expectedBits = size * size * 6;
+      if (bits.length < expectedBits) {
+        alert("セーブデータが短すぎます");
+        return;
+      }
+
+      init();
+
+      let i = 0;
+      const data = [];
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        const m = parseInt(bits.slice(i, i + 2), 2); i += 2;
+        const bluff = bits[i++] === "1";
+        const open = bits[i++] === "1";
+        const f = parseInt(bits.slice(i, i + 2), 2); i += 2;
+        data.push({ x, y, m, bluff, open, f });
+      }
+
+      for (const d of data) {
+        const c = board[d.y][d.x];
+        if (d.m === 1) c.mine = "normal";
+        else if (d.m === 2) c.mine = "heavy";
+      }
+
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        const c = board[y][x];
+        if (!c.mine) c.count = getCount(x, y);
+      }
+
+      for (const d of data) {
+        const c = board[d.y][d.x];
+        if (d.f) {
+          c.flag = ["", "🚩", "⚠️", "☢️"][d.f];
+          c.el.textContent = c.flag;
+          c.el.classList.add('flag');
+        }
+        if (d.open && !c.mine) {
+          c.open = true;
+          c.el.classList.add('open');
+          let n = c.count;
+          if (d.bluff) n = Math.max(1, n - 1);
+          if (n > 0) {
+            c.el.textContent = n;
+            c.el.style.color = getColor(n);
+          }
+        }
+      }
+
+      statusEl.textContent = "ロード完了 ✅";
     }
-  }
-
-  statusEl.textContent = "ロード完了 ✅";
-}
-
 
     init();
   </script>
