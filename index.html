@@ -41,6 +41,16 @@
 
   <div id="controls">
     <button id="resetButton">🔄 リセット</button>
+
+    <!-- ★追加：ヒント発生率の入力欄 -->
+    <div style="display:flex;gap:10px;align-items:center;">
+      <label style="font-size:18px;">
+        ヒント確率:
+        <input id="hintInput" type="number" value="10" min="0" max="100" style="width:60px;">
+        %
+      </label>
+    </div>
+
     <div class="flag-options">
       <label><input type="radio" name="flag" value="🚩">🚩</label>
       <label><input type="radio" name="flag" value="⚠️">⚠️</label>
@@ -60,7 +70,7 @@
     const size = 20, mineCount = 100, DECEPTION_PROBABILITY = 0.5;
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let board = [], gameOver = false, openedCount = 0, timer, timerSeconds = 0,
-        firstClick = null, selectedFlag = null, hintRate = 10; // ← ヒント率（%）
+        firstClick = null, selectedFlag = null, hintRate = 10;
 
     const boardEl = document.getElementById("board"),
           statusEl = document.getElementById("status"),
@@ -78,9 +88,9 @@
     });
 
     function init() {
-      // ★ ヒント率入力（デフォルト10%）
-      let v = prompt("ヒント発生確率を入力（0〜100）", hintRate);
-      v = Number(v);
+      // ★修正：prompt()を廃止し、入力欄からヒント率を取得
+      const input = document.getElementById("hintInput");
+      let v = Number(input.value);
       if (isNaN(v) || v < 0 || v > 100) v = 10;
       hintRate = v;
 
@@ -156,7 +166,7 @@
       return n;
     }
 
-    // ★★★ ヒント処理追加 ★★★
+    // ★ ヒント処理
     function openCell(c) {
       if (c.open) return; c.open = true; openedCount++;
       c.el.classList.add('open'); c.el.classList.remove('flag');
@@ -169,7 +179,7 @@
         c.el.textContent = d;
         c.el.style.color = getColor(d);
 
-        // ★ deception が起きていない場合にヒント抽選
+        // ★ deception でなければヒント抽選
         if (!deception) {
           if (Math.random() < hintRate / 100) {
             c.el.style.backgroundColor = "#e8d5ff"; // 薄紫
@@ -208,7 +218,6 @@
       }
     }
 
-    // === セーブ ===
     function saveBoard() {
       if (!firstClick) return alert("盤面未生成です");
       let bits = "";
@@ -227,7 +236,6 @@
       prompt("セーブデータをコピーしてください", s);
     }
 
-    // === ロード ===
     function loadBoard() {
       const s = prompt("セーブデータを入力してください");
       if (!s) return;
